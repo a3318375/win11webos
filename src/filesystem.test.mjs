@@ -1,0 +1,8 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { uniqueName, validName, snapshot, moveEntry, pasteEntries } from './filesystem.ts';
+const files=[{id:'f0',name:'桌面',parent:'root',kind:'folder'},{id:'f2',name:'文档',parent:'root',kind:'folder'},{id:'a',name:'项目',parent:'f2',kind:'folder'},{id:'b',name:'子目录',parent:'a',kind:'folder'},{id:'c',name:'说明.txt',parent:'b',kind:'text',content:'hello'}];
+test('names preserve extensions and avoid collisions',()=>{assert.equal(uniqueName([...files,{id:'x',parent:'b',name:'说明 (2).txt'}],'b','说明.txt'),'说明 (3).txt');assert.ok(validName('a/b'));assert.ok(validName('CON.txt'));assert.equal(validName('文档.txt'),'');});
+test('move rejects recursive destinations and system folders',()=>{assert.throws(()=>moveEntry(files,'a','b'));assert.throws(()=>moveEntry(files,'f2','a'));assert.equal(moveEntry(files,'a','f0').find(e=>e.id==='a').parent,'f0');});
+test('copy snapshots all nested content with fresh ids',()=>{const clip={mode:'copy',sourceId:'a',items:snapshot(files,'a')};const result=pasteEntries(files,clip,'f2');const copy=result.entries.find(e=>e.id===result.id);assert.equal(copy.name,'项目 (2)');const sub=result.entries.find(e=>e.parent===copy.id);const note=result.entries.find(e=>e.parent===sub.id);assert.equal(note.content,'hello');assert.notEqual(note.id,'c');assert.equal(result.entries.length,8);});
+test('cut keeps identity and stale cut fails',()=>{const clip={mode:'cut',sourceId:'c',items:snapshot(files,'c')};assert.equal(pasteEntries(files,clip,'f0').entries.find(e=>e.id==='c').parent,'f0');assert.throws(()=>pasteEntries(files.filter(e=>e.id!=='c'),clip,'f0'));});

@@ -1,0 +1,20 @@
+node_modules/
+dist/
+.npm-cache/
+*.tsbuildinfo
+
+# Local tooling and environment files
+.vite/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Local verification screenshots
+/preview.png
+/preview-interactions.png
