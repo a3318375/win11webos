@@ -1,4 +1,6 @@
 node_modules/
+/api/bin/
+/api/data/
 dist/
 .npm-cache/
 *.tsbuildinfo
