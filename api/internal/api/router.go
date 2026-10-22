@@ -6,10 +6,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"win11webos/api/internal/mount"
 	"win11webos/api/internal/storage"
 )
 
-func NewRouter(logger *slog.Logger) *gin.Engine {
+func NewRouter(logger *slog.Logger, services ...*mount.Service) *gin.Engine {
 	r := gin.New()
 	r.HandleMethodNotAllowed = true
 	// Only explicitly configured reverse proxies should be trusted in production.
@@ -34,12 +35,16 @@ func NewRouter(logger *slog.Logger) *gin.Engine {
 		c.JSON(http.StatusOK, gin.H{"data": gin.H{"status": "ok", "service": "cloud-drive-api"}})
 	})
 	v1 := r.Group("/api/v1")
-	v1.GET("/providers", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"data": storage.Providers()}) })
-	// Deliberately do not accept or store credentials until persistence,
-	// encryption and authentication are implemented.
-	v1.POST("/accounts", func(c *gin.Context) {
-		fail(c, http.StatusNotImplemented, "not_implemented", "真实网盘关联尚未实现，请使用前端演示流程")
-	})
+	if len(services) > 0 && services[0] != nil {
+		mountRoutes(v1, services[0])
+	} else {
+		v1.GET("/providers", func(c *gin.Context) { c.JSON(http.StatusOK, gin.H{"data": storage.Providers()}) })
+		// Deliberately do not accept or store credentials until persistence,
+		// encryption and authentication are implemented.
+		v1.POST("/accounts", func(c *gin.Context) {
+			fail(c, http.StatusNotImplemented, "not_implemented", "真实网盘关联尚未实现，请使用前端演示流程")
+		})
+	}
 	r.NoRoute(func(c *gin.Context) { fail(c, http.StatusNotFound, "not_found", "接口不存在") })
 	r.NoMethod(func(c *gin.Context) {
 		fail(c, http.StatusMethodNotAllowed, "method_not_allowed", "请求方法不受支持")
