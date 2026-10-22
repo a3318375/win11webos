@@ -1,4 +1,4 @@
-export type Entry = { id:string; name:string; parent:string; kind:'folder'|'text'|'image'; content?:string; deleted?:boolean };
+export type Entry = { id:string; name:string; parent:string; kind:'folder'|'text'|'image'; content?:string; src?:string; deleted?:boolean };
 export type FileClipboard = { mode:'copy'|'cut'; sourceId:string; items:Entry[] };
 export function validName(name:string) {
   if (!name.trim()) return '名称不能为空。';
