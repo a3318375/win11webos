@@ -82,3 +82,68 @@ Windows、Microsoft Edge 和相关应用图标归各自权利人所有。本项�
 本地目录支持真实图片 / 文本预览和文件下载；夸克支持代理下载。夸克和本地 NAS 支持右键新建文件夹、重命名、批量复制 / 剪切 / 粘贴及移入回收站。可在空白处拖动框选，Ctrl 点击增减选择、Shift 连选，支持 Ctrl+A/C/X/V、F2、Delete、Ctrl+Shift+N。剪切项变淡；同名项目拒绝覆盖，暂不支持跨网盘粘贴。115 / 百度自动授权需要配置兼容的可信 OAuth 服务，夸克提供扫码入口；未完成真实账号联调的远程操作仅经过模拟协议测试。运行和配置参见 [后端说明](api/README.md)。
 
 选中文件/文件夹后，右键或工具栏“下载到本地”，选择已挂载的 NAS 和目标目录，支持同名跳过/自动重命名。左侧“传输任务”查看进度、速度、错误、暂停/继续、取消/重试、打开目标和移除记录。任务在 Go 后端运行，关闭窗口继续执行，最多并行 2 个任务；重启后可继续，已完成文件保留，当前文件重新下载。当前来源为夸克/本地 NAS，目标只支持运行后端的设备可访问的本地硬盘/映射 NAS。实现对照见 [传输设计](docs/local-transfer-design.md)。
+
+## Linux 直接安装（无需 Nginx / Node / Go / Docker）
+
+从 GitHub Releases 下载对应架构的 `webos-linux-amd64.tar.gz`（普通 x86 NAS / PC）或 `webos-linux-arm64.tar.gz`（ARM64）。前端已编译，Go 程序同时提供页面和 API。
+
+以下示例在 `/opt/webos` 内完成下载、解压和安装；也可将第一行改成 `/home/你的用户名/webos` 或 `/data/webos`，选择当前用户有写权限的目录：
+
+```bash
+INSTALL=/opt/webos
+mkdir -p "$INSTALL/tmp/package"
+cd "$INSTALL/tmp"
+# ARM64 设备将 amd64 改为 arm64
+curl -fL https://github.com/a3318375/win11webos/releases/latest/download/webos-linux-amd64.tar.gz -o webos.tar.gz
+curl -fL https://github.com/a3318375/win11webos/releases/latest/download/SHA256SUMS -o SHA256SUMS
+mv webos.tar.gz webos-linux-amd64.tar.gz
+sha256sum --ignore-missing -c SHA256SUMS
+tar -xzf webos-linux-amd64.tar.gz -C package
+bash package/install.sh "$INSTALL"
+rm -f webos-linux-amd64.tar.gz SHA256SUMS
+rm -r package
+```
+
+可在安装命令末尾指定端口，例如 `bash package/install.sh "$INSTALL" 8888`；默认 9999。已安装时可在 `config.sh` 设置 `export CLOUD_API_ADDR="127.0.0.1:8888"` 后停止、启动应用。
+
+安装完成自动后台启动，访问 http://localhost:9999 。SSH 安装到 NAS 时，可在自己电脑执行 `ssh -L 9999:127.0.0.1:9999 用户名@NAS地址`，再访问此地址。当前尚无管理员登录，因此保留仅本机监听。
+
+```bash
+bash /opt/webos/webos.sh status
+bash /opt/webos/webos.sh stop
+bash /opt/webos/webos.sh start
+```
+
+后台运行不依赖终端保持连接；当前不注册开机自启动服务。升级前先 stop，再安装新版到同一目录，数据库、密钥和配置会保留。删除前先停止进程；备份 `data` 时必须同时保留数据库与密钥。
+
+安装目录内容：
+
+| 目录 / 文件 | 用途 |
+| --- | --- |
+| `bin`、`www` | 后端程序、前端静态文件 |
+| `data` | SQLite、加密密钥、传输记录 |
+| `logs` | 当前及上次启动日志；单次运行日志持续追加 |
+| `tmp`、`cache`、`run` | 应用临时文件、缓存、PID |
+| `storage` | 默认允许挂载的本地文件目录 |
+| `config.sh` | 可选配置，升级保留 |
+
+默认无需填写配置。要挂载已有 NAS 硬盘，在安装目录的 `config.sh` 中写入：
+
+```bash
+export CLOUD_LOCAL_ROOTS="/data:/st"
+```
+
+重启应用，然后在本地 NAS 关联弹窗直接填 `/data` 或 `/st`。物理安装填写实际服务器路径，无需容器映射。用户主动下载的文件及传输临时文件会写入所选目标磁盘，其他应用数据保持在安装目录。
+
+### GitHub Release 构建
+
+推送到 `main` 且此次推送最后一个提交信息包含 `[build]` 时，工作流测试前后端，交叉编译 Linux amd64 / arm64，验证 amd64 包安装和 HTTP 服务，再发布 Release（两种压缩包及 SHA256SUMS）。普通提交不发布，无需额外 Token，仓库需允许 Actions 写入 Contents。
+
+```bash
+git commit -m "feat: update application [build]"
+```
+
+### Windows 本地开发
+
+运行 `deploy/dev-api.ps1` 启动后端，另开终端 `npm run dev -- --port 5173 --strictPort`。仅此开发脚本启用 `/data` → `D:\tmp\res\data` 的别名，正式安装不启用。
+本地 NAS 现通过硬盘列表选择，取代手填路径。共享硬盘状态缓存每 5 分钟更新，休眠或状态未知不可选。Linux 直连 ATA 状态查询需要 hdparm 和设备查询权限；USB/RAID/网络盘及 Windows 尚不支持安全识别，不自动降级为活动。只列出 CLOUD_LOCAL_ROOTS 配置的存储目录。此机制限制选择动作，不会拦截已有挂载的文件读写或传输；状态缓存存在最长约5分钟延迟。

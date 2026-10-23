@@ -41,7 +41,12 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer service.Close()
-	server := &http.Server{Addr: cfg.Addr, Handler: api.NewRouter(logger, service), ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
+	handler := http.NewServeMux()
+	handler.Handle("/api/", api.NewRouter(logger, service))
+	if static := os.Getenv("CLOUD_STATIC_DIR"); static != "" {
+		handler.Handle("/", http.FileServer(http.Dir(static)))
+	}
+	server := &http.Server{Addr: cfg.Addr, Handler: handler, ReadHeaderTimeout: 5 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 1 << 20}
 	// No global WriteTimeout: future large downloads must remain streamable.
 	listener, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {

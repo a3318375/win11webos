@@ -29,6 +29,7 @@ type Listing struct {
 	Total     int       `json:"total"`
 }
 type Service struct {
+	disks            *DiskMonitor
 	store            *Store
 	roots            []string
 	client           *http.Client
@@ -71,9 +72,13 @@ func New(store *Store, roots []string, broker string) (*Service, error) {
 	if err := s.initTransfers(); err != nil {
 		return nil, err
 	}
+	s.disks = newDiskMonitor(s.roots)
 	return s, nil
 }
 func (s *Service) Close() error {
+	if s.disks != nil {
+		s.disks.cancel()
+	}
 	if s.transfers != nil {
 		s.transfers.close()
 	}

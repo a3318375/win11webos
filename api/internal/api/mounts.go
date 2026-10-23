@@ -200,6 +200,7 @@ func mountRoutes(v1 *gin.RouterGroup, s *mount.Service) {
 		}
 		c.JSON(200, gin.H{"data": data})
 	})
+	v1.GET("/local/disks", func(c *gin.Context) { c.JSON(200, gin.H{"data": s.Disks(c.Request.Context())}) })
 	v1.GET("/local/directories", func(c *gin.Context) {
 		data, err := s.Directories(c.Request.Context(), c.Query("path"))
 		if err != nil {

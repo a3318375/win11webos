@@ -1,0 +1,60 @@
+name: Build release
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+jobs:
+  release:
+    if: contains(github.event.head_commit.message, '[build]')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci && npm test && npm run build
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - run: go test ./... && go vet ./...
+        working-directory: api
+      - name: Package Linux releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release
+          for arch in amd64 arm64; do
+            stage="$(mktemp -d)"
+            mkdir -p "$stage/bin" "$stage/www"
+            (cd api && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" go build -trimpath -ldflags="-s -w" -o "$stage/bin/webos" ./cmd/server)
+            cp -R dist/. "$stage/www/"
+            cp deploy/{install,run,webos}.sh "$stage/"
+            chmod +x "$stage/"*.sh "$stage/bin/webos"
+            tar -czf "release/webos-linux-$arch.tar.gz" -C "$stage" .
+            rm -rf "$stage"
+          done
+          (cd release && sha256sum *.tar.gz > SHA256SUMS)
+      - name: Smoke test package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir smoke
+          tar -xzf release/webos-linux-amd64.tar.gz -C smoke
+          bash smoke/install.sh "$RUNNER_TEMP/webos"
+          trap 'bash "$RUNNER_TEMP/webos/webos.sh" stop' EXIT
+          curl --fail http://127.0.0.1:9999/
+          curl --fail http://127.0.0.1:9999/api/health
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          tag="v$(node -p "require('./package.json').version")"
+          gh release create "$tag" release/* --target "$GITHUB_SHA" --title "WebOS $tag" --generate-notes

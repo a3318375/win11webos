@@ -86,6 +86,10 @@ func localList(ctx context.Context, root, id string) ([]Entry, error) {
 	return out, nil
 }
 func (s *Service) validateLocal(root string) (string, error) {
+	// Explicit development alias; normal deployments leave this unset.
+	if target := os.Getenv("CLOUD_DEV_DATA_DIR"); target != "" && root == "/data" {
+		root = target
+	}
 	absolute, err := filepath.Abs(strings.TrimSpace(root))
 	if err != nil {
 		return "", errors.New("本地路径无效")

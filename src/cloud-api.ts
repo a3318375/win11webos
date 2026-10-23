@@ -13,7 +13,9 @@ export async function apiRequest<T>(path:string,method='GET',body?:unknown,signa
  let data:{data:T;error?:{message:string}};try{data=await response.json()}catch{throw new Error('后端暂时不可用，请检查服务状态');}
  if(!response.ok||data.error)throw new Error(data.error?.message||`请求失败（${response.status}）`);return data.data;
 }
+export type DiskStatus={path:string;device:string;state:'active'|'sleeping'|'unknown';reason:string;checkedAt:string};
 export const cloudApi={
+ disks:()=>apiRequest<DiskStatus[]>('/local/disks'),
  transfers:(signal?:AbortSignal)=>apiRequest<TransferTask[]>('/transfers','GET',undefined,signal),
  createTransfer:(input:TransferInput)=>apiRequest<TransferTask>('/transfers','POST',input),
  transferAction:(id:string,action:'pause'|'cancel'|'retry'|'remove')=>apiRequest<TransferTask>(`/transfers/${encodeURIComponent(id)}/action`,'POST',{action}),
